@@ -329,7 +329,7 @@ Resources:
       HealthCheckTimeoutSeconds: 15
       HealthyThresholdCount: 5
       HealthCheckPath: "/"
-      Port: 80
+      Port: 8080
       Protocol: HTTP
       Targets:
       - Id: !Ref EC2Instance1
@@ -342,7 +342,7 @@ Resources:
       - Key: Name
         Value: EC2TargetGroup
       - Key: Port
-        Value: 80
+        Value: 8080
 
   ElasticApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
