@@ -257,7 +257,7 @@ Resources:
     DependsOn: NAT1
     Type: AWS::EC2::Instance
     Properties: 
-      ImageId: ami-047bb4163c506cd98 
+      ImageId: ami-0069d66985b09d219
       InstanceType: t2.micro 
       NetworkInterfaces:
         - AssociatePublicIpAddress: 'false'
@@ -289,7 +289,7 @@ Resources:
     DependsOn: NAT2
     Type: AWS::EC2::Instance
     Properties: 
-      ImageId: ami-047bb4163c506cd98 
+      ImageId: ami-0069d66985b09d219
       InstanceType: t2.micro 
       NetworkInterfaces:
         - AssociatePublicIpAddress: 'false'
