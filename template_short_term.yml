@@ -228,7 +228,6 @@ Resources:
           ToPort: 8080
           DestinationSecurityGroupId: !GetAtt EC2SecurityGroup.GroupId
 
-  # EC2 Security Group Allowing Port 22 from anywhere and 80 from ELBSecGroup
   EC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -274,15 +273,17 @@ Resources:
           export DB_UNAME=${DbUname}
           export DB_PWD=${DbPwd}
           yum update -y
+          wget http://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo -O /etc/yum.repos.d/epel-apache-maven.repo
+          sed -i s/\$releasever/6/g /etc/yum.repos.d/epel-apache-maven.repo
+          yum install -y apache-maven 
           yum install java-1.8.0-openjdk-devel -y
           yum install git -y
           git clone https://github.com/adileone/awsSA_short_term.git
-          yum install maven -y
-          cd awsSA/demo/
+          cd awsSA_short_term/demo/
           mvn clean install
           mvn spring-boot:run
       Tags:
-        - Key: name
+        - Key: Name
           Value: awsSA-instance1
 
   EC2Instance2:
@@ -306,15 +307,17 @@ Resources:
           export DB_UNAME=${DbUname}
           export DB_PWD=${DbPwd}
           yum update -y
+          wget http://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo -O /etc/yum.repos.d/epel-apache-maven.repo
+          sed -i s/\$releasever/6/g /etc/yum.repos.d/epel-apache-maven.repo
+          yum install -y apache-maven 
           yum install java-1.8.0-openjdk-devel -y
           yum install git -y
           git clone https://github.com/adileone/awsSA_short_term.git
-          yum install maven -y
-          cd awsSA/demo/
+          cd awsSA_short_term/demo/
           mvn clean install
           mvn spring-boot:run
       Tags:
-        - Key: name
+        - Key: Name
           Value: awsSA-instance2
 
   TargetGroup:
@@ -339,7 +342,7 @@ Resources:
       - Key: Name
         Value: EC2TargetGroup
       - Key: Port
-        Value: 80          
+        Value: 80
 
   ElasticApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
