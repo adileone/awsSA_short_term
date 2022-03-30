@@ -1,0 +1,364 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: awsSA-common-assignment-stack
+
+Parameters:
+
+  VpcCidrBlock:
+    Type: String
+    Default: "10.0.0.0/16"
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Description: CIDR block for the VPC
+
+  #should be in Secret. Hardcoded for simplicity.
+  DbPwd:
+    Type: String
+    Default: 'example1'
+
+  DbUname:
+    Type: String
+    Default: 'awsSAdb'
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock:
+        !Ref VpcCidrBlock
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: 'Name'
+          Value: 'awsSA-common-vpc'
+
+  EC2Subnet1Public:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      VpcId: !Ref VPC
+      CidrBlock:
+        !Select [ 0, !Cidr [ !Ref VpcCidrBlock, 4, 8 ]]
+      AvailabilityZone: !Select 
+        - 0
+        - Fn::GetAZs: !Ref 'AWS::Region'
+
+  EC2Subnet1Private:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      VpcId: !Ref VPC
+      CidrBlock:
+        !Select [ 1, !Cidr [ !Ref VpcCidrBlock, 4, 8 ]]
+      AvailabilityZone: !Select 
+        - 0
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      
+  EC2Subnet2Public:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      VpcId: !Ref VPC
+      CidrBlock:
+        #Will create a list of 4 CIDR ranges, of size of /24 (32-8). Each subnet will have 255 addresses. 
+        !Select [ 2, !Cidr [ !Ref VpcCidrBlock, 4, 8 ]]
+      AvailabilityZone: !Select 
+        - 1
+        - Fn::GetAZs: !Ref 'AWS::Region'
+
+  EC2Subnet2Private:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      VpcId: !Ref VPC
+      CidrBlock:
+        #Will create a list of 4 CIDR ranges, of size of /24 (32-8). Each subnet will have 255 addresses. 
+        !Select [ 3, !Cidr [ !Ref VpcCidrBlock, 4, 8 ]]
+      AvailabilityZone: !Select 
+        - 1
+        - Fn::GetAZs: !Ref 'AWS::Region'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway     
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway  
+
+  PublicSubnetARouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref EC2Subnet1Public
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetARouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref EC2Subnet2Public
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  PrivateSubnetARouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref EC2Subnet1Private
+      RouteTableId: !Ref PrivateRouteTable1
+
+  PrivateSubnetARouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref EC2Subnet2Private
+      RouteTableId: !Ref PrivateRouteTable2
+
+  NAT1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+        - EIP1
+        - AllocationId
+      SubnetId:
+        Ref: EC2Subnet1Public
+  
+  EIP1:
+    DependsOn: VPCGatewayAttachment
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  RouteNAT1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+         Ref: NAT1
+
+  NAT2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+        - EIP2
+        - AllocationId
+      SubnetId:
+        Ref: EC2Subnet2Public
+  
+  EIP2:
+    DependsOn: VPCGatewayAttachment
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  RouteNAT2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+         Ref: NAT2              
+                      
+  # ELB Security Group allowing Port 80 from anywhere
+  ELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "awsSA-common-elb"
+      GroupDescription: 'Port 80-8080'
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          DestinationSecurityGroupId: !GetAtt EC2SecurityGroup.GroupId
+
+  # EC2 Security Group Allowing Port 22 from anywhere and 80 from ELBSecGroup
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: 'Port 8080'
+        VpcId:
+          Ref: VPC
+
+  InboundRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: tcp
+      FromPort: 8080
+      ToPort: 8080
+      SourceSecurityGroupId: !GetAtt ELBSecurityGroup.GroupId
+      GroupId: !GetAtt EC2SecurityGroup.GroupId
+  InboundRuleMySQL:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      SourceSecurityGroupId: !GetAtt EC2SecurityGroup.GroupId
+      GroupId: !GetAtt EC2SecurityGroup.GroupId                
+
+  EC2Instance1:
+    DependsOn: NAT1
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: ami-0cd13f8ca59040cc1
+      KeyName: 'awsSA-key-pair'
+      InstanceType: "t3.micro"
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: 'false'
+          DeviceIndex: '0'
+          GroupSet:
+          - !Ref EC2SecurityGroup
+          SubnetId:
+            Ref: EC2Subnet1Private
+      UserData: 
+        Fn::Base64: !Sub | 
+          #!/bin/bash
+          export IP_ADDR=$(hostname -f)
+          export DB_ADDRESS=${MySQL.Endpoint.Address}
+          export DB_UNAME=${DbUname}
+          export DB_PWD=${DbPwd}
+          yum update -y
+          yum install java-1.8.0-openjdk-devel -y
+          yum install git -y
+          git clone https://github.com/adileone/awsSA.git
+          yum install maven -y
+          cd awsSA/demo/
+          mvn clean install
+          mvn spring-boot:run
+      Tags:
+        - Key: name
+          Value: awsSA-instance1
+
+  EC2Instance2:
+    DependsOn: NAT2
+    Type: AWS::EC2::Instance
+    Properties: 
+      KeyName: 'awsSA-key-pair'
+      ImageId: ami-0cd13f8ca59040cc1
+      InstanceType: "t3.micro"
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: 'false'
+          DeviceIndex: '0'
+          GroupSet:
+          - !Ref EC2SecurityGroup
+          SubnetId:
+            Ref: EC2Subnet2Private
+      UserData: 
+        Fn::Base64: !Sub | 
+          #!/bin/bash
+          export IP_ADDR=$(hostname -f)
+          export DB_ADDRESS=${MySQL.Endpoint.Address}
+          export DB_UNAME=${DbUname}
+          export DB_PWD=${DbPwd}
+          yum update -y
+          yum install java-1.8.0-openjdk-devel -y
+          yum install git -y
+          git clone https://github.com/adileone/awsSA.git
+          yum install maven -y
+          cd awsSA/demo/
+          mvn clean install
+          mvn spring-boot:run
+      Tags:
+        - Key: name
+          Value: awsSA-instance2
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: awsSATG
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 15
+      HealthyThresholdCount: 5
+      HealthCheckPath: "/"
+      Port: 80
+      Protocol: HTTP
+      Targets:
+      - Id: !Ref EC2Instance1
+        Port: 8080
+      - Id: !Ref EC2Instance2
+        Port: 8080
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: EC2TargetGroup
+      - Key: Port
+        Value: 80          
+
+  ElasticApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      Name: awsSALB
+      Type: application
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref ELBSecurityGroup
+      Subnets: 
+        - !Ref EC2Subnet1Public
+        - !Ref EC2Subnet2Public
+
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: "forward"
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ElasticApplicationLoadBalancer
+      Port: 8080
+      Protocol: "HTTP"
+  
+  MySQL:
+    Type: AWS::RDS::DBInstance
+    Properties: 
+      DBInstanceClass: db.m5.large
+      DBInstanceIdentifier: 'awsSAdb'
+      DBName: 'awsSAdb'
+      Engine: mysql
+      MasterUsername: !Ref DbUname
+      MasterUserPassword: !Ref DbPwd 
+      Port: 3306
+      AllocatedStorage: 20
+      DBSubnetGroupName: !Ref myDBSubnetGroup
+      VPCSecurityGroups: 
+        - !Ref EC2SecurityGroup
+  
+  myDBSubnetGroup: 
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties: 
+      DBSubnetGroupDescription: 'VPC for RDS declaration'
+      SubnetIds: 
+        - !Ref EC2Subnet1Private
+        - !Ref EC2Subnet2Private
+      
+Outputs:
+  LoadBalancerUrl:
+    Description: The URL of the ALB to Tomcat 
+    Value: !Sub 'http://${ElasticApplicationLoadBalancer.DNSName}:8080'

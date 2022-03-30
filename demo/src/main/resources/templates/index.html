@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<title>Homepage</title>
+
+<body>
+
+    <h1>awsSA Demo App!</h1>
+
+    <h2>
+        <p>Hello World from: <span th:text="${ip}"></span></p>
+    </h2>
+
+
+    <table>
+
+        <thead class="ttop">
+            <tr class="table-info">
+                <td><b>ID (INT)</b> </td>
+                <td><b>NAME (STRING)</b> </td>
+                <td><b>SALARY (INT)</b> </td>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="empl, iStat : ${listEmployees}" th:style="${iStat.odd}? 'font-weight: normal;'">
+
+                <td th:text="${empl.id}">
+                </td>
+                <td th:text="${empl.name}">
+                </td>
+                <td th:text="${empl.salary}">
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Save Employee</h2>
+
+    <form name="f" th:action="@{/save}" method="post">
+
+        <div class="input-group">
+            <span class="input-group-addon"><i class="glyphicon glyphicon-envelope"></i></span> <input id="id"
+                type="text" class="form-control" name="id" placeholder="Id">
+        </div>
+        <br>
+        <div class="input-group">
+            <span class="input-group-addon"><i class="glyphicon glyphicon-envelope"></i></span> <input id="name"
+                type="text" class="form-control" name="name" placeholder="Name">
+        </div>
+        <br>
+        <div class="input-group">
+            <span class="input-group-addon"><i class="glyphicon glyphicon-lock"></i></span> <input id="salary"
+                type="text" class="form-control" name="salary" placeholder="Salary">
+        </div>
+        <br>
+        <button type="submit" class="btn btn-info col-2">Save
+            Employee</button>
+    </form>
+
+    <h2>Delete Employee</h2>
+
+    <form name="f" th:action="@{/del}" method="post">
+
+        <div class="input-group">
+            <span class="input-group-addon"><i class="glyphicon glyphicon-envelope"></i></span> <input id="id"
+                type="text" class="form-control" name="id" placeholder="Id">
+        </div>
+        <br>
+        <button type="submit" class="btn btn-info col-2">Delete
+            Employee</button>
+    </form>
+
+</body>
+
+</html>
